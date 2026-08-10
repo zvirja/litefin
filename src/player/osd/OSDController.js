@@ -1887,26 +1887,23 @@ export default class OSDController extends Component {
         const wasHidden = !this._isOsdVisible;
         const seekWithArrows = PlayerSettings.get('seekWithArrows') !== false;
 
+        /*
+         * When the OSD is hidden and "seek with arrows" is enabled, Left/Right
+         * must seek instantly WITHOUT revealing the controls — so this check
+         * has to run before show() is called, otherwise the OSD flashes open
+         * on every seek press regardless of the setting.
+         */
+        if (wasHidden && seekWithArrows && (direction === 'left' || direction === 'right')) {
+            // Focus the seekbar so subsequent presses continue seeking
+            this._currentFocusRow = 2;
+            this._updateFocus();
+            this._executeAction(direction === 'left' ? 'rewind' : 'fastForward');
+            return true;
+        }
+
         // First D-pad press always reveals OSD if hidden
         // User requested single-press move: trigger show AND allow navigation to proceed.
-        if (wasHidden) {
-            this.show();
-
-            /*
-             * When the OSD is hidden, pressing Left or Right arrow key should always
-             * trigger direct seeking (rewind/fastForward) and park focus on the seekbar.
-             */
-            if (seekWithArrows && (direction === 'left' || direction === 'right')) {
-                // Focus the seekbar so subsequent presses continue seeking
-                this._currentFocusRow = 2;
-                this._updateFocus();
-                this._executeAction(direction === 'left' ? 'rewind' : 'fastForward');
-                return true;
-            }
-            // Do NOT return here. Let the navigation logic below run.
-        } else {
-            this.show(); // Always reset auto-hide if already visible
-        }
+        this.show(); // Always reset auto-hide if already visible
 
         if (direction === 'up') {
             const buttonsBelow = PlayerSettings.get('osdButtonsLocation') === 'below';

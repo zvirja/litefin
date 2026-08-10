@@ -1897,7 +1897,7 @@ export default class OSDController extends Component {
             // Focus the seekbar so subsequent presses continue seeking
             this._currentFocusRow = 2;
             this._updateFocus();
-            this._executeAction(direction === 'left' ? 'rewind' : 'fastForward');
+            this._executeAction(direction === 'left' ? 'rewind' : 'fastForward', true);
             return true;
         }
 
@@ -2235,7 +2235,7 @@ export default class OSDController extends Component {
     // Actions & Logic
     // ===================================
 
-    _executeAction(action) {
+    _executeAction(action, silent = false) {
         // ====================================================================
         // ACTIVE TRACK SWITCH GUARD
         // ====================================================================
@@ -2267,7 +2267,7 @@ export default class OSDController extends Component {
                     if (count === 2) targetAction = 'nextChapter';
                     else if (count >= 3) targetAction = 'nextTrack';
 
-                    this._executeActionDirect(targetAction);
+                    this._executeActionDirect(targetAction, silent);
                 }, 350);
                 return;
             }
@@ -2283,16 +2283,16 @@ export default class OSDController extends Component {
                     if (count === 2) targetAction = 'previousChapter';
                     else if (count >= 3) targetAction = 'previousTrack';
 
-                    this._executeActionDirect(targetAction);
+                    this._executeActionDirect(targetAction, silent);
                 }, 350);
                 return;
             }
         }
 
-        this._executeActionDirect(action);
+        this._executeActionDirect(action, silent);
     }
 
-    _executeActionDirect(action) {
+    _executeActionDirect(action, silent = false) {
 
         if (action !== 'fastForward' && action !== 'rewind') {
             log.info('Execute Action:', action);
@@ -2340,14 +2340,14 @@ export default class OSDController extends Component {
                 break;
             case 'rewind': {
                 const skipBackMs = PlayerSettings.get('skipBackLength') || this._config.seekStepBack;
-                this._performDebouncedSeek(-skipBackMs * 10000);
-                this.resetAutoHide();
+                this._performDebouncedSeek(-skipBackMs * 10000, silent);
+                if (!silent) this.resetAutoHide();
                 break;
             }
             case 'fastForward': {
                 const skipFwdMs = PlayerSettings.get('skipForwardLength') || this._config.seekStepForward;
-                this._performDebouncedSeek(skipFwdMs * 10000);
-                this.resetAutoHide();
+                this._performDebouncedSeek(skipFwdMs * 10000, silent);
+                if (!silent) this.resetAutoHide();
                 break;
             }
             case 'previousTrack': this.emit('previous'); break;
@@ -2514,10 +2514,18 @@ export default class OSDController extends Component {
         }
     }
 
-    _performDebouncedSeek(offsetTicks) {
+    _performDebouncedSeek(offsetTicks, silent = false) {
         try {
-            this.show();
-            this.resetAutoHide();
+            /*
+             * Silent seeks (arrow-key seeking while the OSD is hidden, per the
+             * seekWithArrows setting) must update the seek tooltip/position without
+             * revealing the full OSD controls — show() flips .osd-main to visible,
+             * which is exactly what this mode promises not to do.
+             */
+            if (!silent) {
+                this.show();
+                this.resetAutoHide();
+            }
 
             if (this._seekTargetTicks === null) {
                 const startPos = (this._player.getCurrentPositionTicks && this._player.getCurrentPositionTicks()) || 0;
